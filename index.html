@@ -52,6 +52,96 @@
     let pwr = [0, 0]; 
     let wasOpen = [false, false];
 
+    // --- SOUND EFFECTS ---
+    let audioCtx = null;
+    let rasenganNodes = null;
+    let chidoriNodes = null;
+
+    function getAudioCtx() {
+      if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      return audioCtx;
+    }
+
+    // Suspend the AudioContext when the page is hidden to save power,
+    // and resume it when the page becomes visible again.
+    document.addEventListener('visibilitychange', () => {
+      if (!audioCtx) return;
+      if (document.hidden) {
+        if (audioCtx.state === 'running') {
+          audioCtx.suspend();
+        }
+      } else {
+        if (audioCtx.state === 'suspended') {
+          audioCtx.resume();
+        }
+      }
+    });
+    function playRasenganSound() {
+      const ac = getAudioCtx();
+      ac.resume();
+      stopRasenganSound();
+      const osc = ac.createOscillator();
+      const gainNode = ac.createGain();
+      const lfo = ac.createOscillator();
+      const lfoGain = ac.createGain();
+      lfo.frequency.value = 8;
+      lfoGain.gain.value = 120;
+      lfo.connect(lfoGain);
+      lfoGain.connect(osc.frequency);
+      osc.type = 'sine';
+      osc.frequency.value = 180;
+      gainNode.gain.setValueAtTime(0, ac.currentTime);
+      gainNode.gain.linearRampToValueAtTime(0.3, ac.currentTime + 0.4);
+      osc.connect(gainNode);
+      gainNode.connect(ac.destination);
+      lfo.start();
+      osc.start();
+      rasenganNodes = { osc, lfo, gainNode };
+    }
+
+    function stopRasenganSound() {
+      if (rasenganNodes) {
+        const nodes = rasenganNodes;
+        rasenganNodes = null;
+        try { nodes.gainNode.gain.linearRampToValueAtTime(0, getAudioCtx().currentTime + 0.2); } catch(e) { console.error('rasengan gain ramp:', e); }
+        setTimeout(() => { try { nodes.osc.stop(); nodes.lfo.stop(); } catch(e) { console.error('rasengan stop:', e); } }, 250);
+      }
+    }
+
+    function playChidoriSound() {
+      const ac = getAudioCtx();
+      ac.resume();
+      stopChidoriSound();
+      const bufferSize = ac.sampleRate * 2;
+      const buffer = ac.createBuffer(1, bufferSize, ac.sampleRate);
+      const data = buffer.getChannelData(0);
+      for (let i = 0; i < bufferSize; i++) data[i] = Math.random() * 2 - 1;
+      const noise = ac.createBufferSource();
+      noise.buffer = buffer;
+      noise.loop = true;
+      const filter = ac.createBiquadFilter();
+      filter.type = 'bandpass';
+      filter.frequency.value = 3500;
+      filter.Q.value = 0.4;
+      const gainNode = ac.createGain();
+      gainNode.gain.setValueAtTime(0, ac.currentTime);
+      gainNode.gain.linearRampToValueAtTime(0.25, ac.currentTime + 0.15);
+      noise.connect(filter);
+      filter.connect(gainNode);
+      gainNode.connect(ac.destination);
+      noise.start();
+      chidoriNodes = { noise, gainNode };
+    }
+
+    function stopChidoriSound() {
+      if (chidoriNodes) {
+        const nodes = chidoriNodes;
+        chidoriNodes = null;
+        try { nodes.gainNode.gain.linearRampToValueAtTime(0, getAudioCtx().currentTime + 0.15); } catch(e) { console.error('chidori gain ramp:', e); }
+        setTimeout(() => { try { nodes.noise.stop(); } catch(e) { console.error('chidori stop:', e); } }, 200);
+      }
+    }
+
     function checkOpen(pts) {
         let count = 0;
         const wrist = pts[0];
@@ -99,6 +189,10 @@
                     const vid = isR ? s : n;
                     vid.currentTime = 0;
                     vid.play();
+                    if (isR) playChidoriSound(); else playRasenganSound();
+                }
+                if (!open && wasOpen[idx]) {
+                    if (isR) stopChidoriSound(); else stopRasenganSound();
                 }
                 wasOpen[idx] = open;
 
@@ -132,11 +226,13 @@
         if (!fL) {
             pwr[0] = Math.max(0, pwr[0] - 0.15);
             if (pwr[0] > 0.01) { n.style.display = 'block'; n.style.opacity = pwr[0]; }
+            if (wasOpen[0]) stopRasenganSound();
             wasOpen[0] = false;
         }
         if (!fR) {
             pwr[1] = Math.max(0, pwr[1] - 0.15);
             if (pwr[1] > 0.01) { s.style.display = 'block'; s.style.opacity = pwr[1]; }
+            if (wasOpen[1]) stopChidoriSound();
             wasOpen[1] = false;
         }
         ctx.restore();
