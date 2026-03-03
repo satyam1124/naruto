@@ -77,7 +77,7 @@
       }
     });
     // --- RASENGAN / WIND STYLE ---
-    // Deep spinning wind whoosh: layered filtered noise + rising pitch roar.
+    // Deep spinning wind whoosh: layered filtered noise + a pitch roar that swells then settles.
     function playRasenganSound() {
       const ac = getAudioCtx();
       ac.resume();
@@ -228,7 +228,7 @@
 
       const chirpLFO = ac.createOscillator();
       chirpLFO.type = 'square';
-      chirpLFO.frequency.value = 38; // ~38 crackles per second
+      chirpLFO.frequency.value = 38; // ~38 Hz chosen to mimic the rapid "one thousand birds" chirping rhythm
 
       const chirpLFOGain = ac.createGain();
       chirpLFOGain.gain.value = 0.18;
