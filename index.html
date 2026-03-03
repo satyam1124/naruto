@@ -62,6 +62,20 @@
       return audioCtx;
     }
 
+    // Suspend the AudioContext when the page is hidden to save power,
+    // and resume it when the page becomes visible again.
+    document.addEventListener('visibilitychange', () => {
+      if (!audioCtx) return;
+      if (document.hidden) {
+        if (audioCtx.state === 'running') {
+          audioCtx.suspend();
+        }
+      } else {
+        if (audioCtx.state === 'suspended') {
+          audioCtx.resume();
+        }
+      }
+    });
     function playRasenganSound() {
       const ac = getAudioCtx();
       stopRasenganSound();
