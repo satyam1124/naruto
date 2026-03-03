@@ -76,69 +76,213 @@
         }
       }
     });
+    // --- RASENGAN / WIND STYLE ---
+    // Deep spinning wind whoosh: layered filtered noise + rising pitch roar.
     function playRasenganSound() {
       const ac = getAudioCtx();
       ac.resume();
       stopRasenganSound();
-      const osc = ac.createOscillator();
-      const gainNode = ac.createGain();
+      const t = ac.currentTime;
+
+      // Master gain – fade in over 0.5 s
+      const master = ac.createGain();
+      master.gain.setValueAtTime(0, t);
+      master.gain.linearRampToValueAtTime(0.45, t + 0.5);
+      master.connect(ac.destination);
+
+      // Layer 1: low-freq wind roar – white noise through a low-pass sweep
+      const bufLen = ac.sampleRate * 3;
+      const buf = ac.createBuffer(1, bufLen, ac.sampleRate);
+      const d = buf.getChannelData(0);
+      for (let i = 0; i < bufLen; i++) d[i] = Math.random() * 2 - 1;
+
+      const noise = ac.createBufferSource();
+      noise.buffer = buf;
+      noise.loop = true;
+
+      const lpf = ac.createBiquadFilter();
+      lpf.type = 'lowpass';
+      lpf.frequency.setValueAtTime(180, t);
+      lpf.frequency.linearRampToValueAtTime(520, t + 0.5);
+      lpf.frequency.linearRampToValueAtTime(340, t + 1.2);
+      lpf.Q.value = 3.5;
+
+      const noiseGain = ac.createGain();
+      noiseGain.gain.value = 0.6;
+      noise.connect(lpf);
+      lpf.connect(noiseGain);
+      noiseGain.connect(master);
+      noise.start();
+
+      // Layer 2: spinning whoosh – band-pass noise modulated by a slow LFO
+      const buf2 = ac.createBuffer(1, bufLen, ac.sampleRate);
+      const d2 = buf2.getChannelData(0);
+      for (let i = 0; i < bufLen; i++) d2[i] = Math.random() * 2 - 1;
+      const noise2 = ac.createBufferSource();
+      noise2.buffer = buf2;
+      noise2.loop = true;
+
+      const bpf = ac.createBiquadFilter();
+      bpf.type = 'bandpass';
+      bpf.frequency.value = 600;
+      bpf.Q.value = 1.2;
+
+      // LFO sweeps the band-pass centre frequency to simulate rotation
       const lfo = ac.createOscillator();
-      const lfoGain = ac.createGain();
-      lfo.frequency.value = 8;
-      lfoGain.gain.value = 120;
-      lfo.connect(lfoGain);
-      lfoGain.connect(osc.frequency);
-      osc.type = 'sine';
-      osc.frequency.value = 180;
-      gainNode.gain.setValueAtTime(0, ac.currentTime);
-      gainNode.gain.linearRampToValueAtTime(0.3, ac.currentTime + 0.4);
-      osc.connect(gainNode);
-      gainNode.connect(ac.destination);
+      lfo.type = 'sine';
+      lfo.frequency.value = 5;
+      const lfoG = ac.createGain();
+      lfoG.gain.value = 280;
+      lfo.connect(lfoG);
+      lfoG.connect(bpf.frequency);
+
+      const bpGain = ac.createGain();
+      bpGain.gain.value = 0.5;
+      noise2.connect(bpf);
+      bpf.connect(bpGain);
+      bpGain.connect(master);
+      noise2.start();
       lfo.start();
-      osc.start();
-      rasenganNodes = { osc, lfo, gainNode };
+
+      // Layer 3: sub-bass rumble oscillator for the "chakra pressure" feel
+      const sub = ac.createOscillator();
+      sub.type = 'sawtooth';
+      sub.frequency.setValueAtTime(55, t);
+      sub.frequency.linearRampToValueAtTime(80, t + 0.6);
+      sub.frequency.linearRampToValueAtTime(60, t + 1.5);
+      const subFilter = ac.createBiquadFilter();
+      subFilter.type = 'lowpass';
+      subFilter.frequency.value = 160;
+      const subGain = ac.createGain();
+      subGain.gain.value = 0.18;
+      sub.connect(subFilter);
+      subFilter.connect(subGain);
+      subGain.connect(master);
+      sub.start();
+
+      rasenganNodes = { noise, noise2, lfo, sub, master };
     }
 
     function stopRasenganSound() {
       if (rasenganNodes) {
         const nodes = rasenganNodes;
         rasenganNodes = null;
-        try { nodes.gainNode.gain.linearRampToValueAtTime(0, getAudioCtx().currentTime + 0.2); } catch(e) { console.error('rasengan gain ramp:', e); }
-        setTimeout(() => { try { nodes.osc.stop(); nodes.lfo.stop(); } catch(e) { console.error('rasengan stop:', e); } }, 250);
+        const ac = getAudioCtx();
+        try { nodes.master.gain.linearRampToValueAtTime(0, ac.currentTime + 0.3); } catch(e) { console.error('rasengan gain ramp:', e); }
+        setTimeout(() => {
+          try { nodes.noise.stop(); } catch(e) {}
+          try { nodes.noise2.stop(); } catch(e) {}
+          try { nodes.lfo.stop(); } catch(e) {}
+          try { nodes.sub.stop(); } catch(e) {}
+        }, 350);
       }
     }
 
+    // --- CHIDORI (ONE THOUSAND BIRDS) ---
+    // Rapid electric crackling / chirping: layered high-freq noise bursts +
+    // fast-modulated oscillators to mimic the iconic lightning-bird sound.
     function playChidoriSound() {
       const ac = getAudioCtx();
       ac.resume();
       stopChidoriSound();
-      const bufferSize = ac.sampleRate * 2;
-      const buffer = ac.createBuffer(1, bufferSize, ac.sampleRate);
-      const data = buffer.getChannelData(0);
-      for (let i = 0; i < bufferSize; i++) data[i] = Math.random() * 2 - 1;
+      const t = ac.currentTime;
+
+      // Master gain
+      const master = ac.createGain();
+      master.gain.setValueAtTime(0, t);
+      master.gain.linearRampToValueAtTime(0.4, t + 0.12);
+      master.connect(ac.destination);
+
+      // Layer 1: crisp high-frequency crackling noise (bandpass around 4–6 kHz)
+      const bufLen = ac.sampleRate * 2;
+      const buf = ac.createBuffer(1, bufLen, ac.sampleRate);
+      const d = buf.getChannelData(0);
+      for (let i = 0; i < bufLen; i++) d[i] = Math.random() * 2 - 1;
       const noise = ac.createBufferSource();
-      noise.buffer = buffer;
+      noise.buffer = buf;
       noise.loop = true;
-      const filter = ac.createBiquadFilter();
-      filter.type = 'bandpass';
-      filter.frequency.value = 3500;
-      filter.Q.value = 0.4;
-      const gainNode = ac.createGain();
-      gainNode.gain.setValueAtTime(0, ac.currentTime);
-      gainNode.gain.linearRampToValueAtTime(0.25, ac.currentTime + 0.15);
-      noise.connect(filter);
-      filter.connect(gainNode);
-      gainNode.connect(ac.destination);
+
+      const hpf = ac.createBiquadFilter();
+      hpf.type = 'highpass';
+      hpf.frequency.value = 3800;
+      hpf.Q.value = 0.7;
+
+      const bpf = ac.createBiquadFilter();
+      bpf.type = 'bandpass';
+      bpf.frequency.value = 5500;
+      bpf.Q.value = 0.5;
+
+      const noiseGain = ac.createGain();
+      noiseGain.gain.value = 0.55;
+      noise.connect(hpf);
+      hpf.connect(bpf);
+      bpf.connect(noiseGain);
+      noiseGain.connect(master);
       noise.start();
-      chidoriNodes = { noise, gainNode };
+
+      // Layer 2: rapid "chirp" oscillator cluster – fast amplitude LFO
+      // gives the stuttering bird-flock / electric crackling rhythm
+      const chirpOsc = ac.createOscillator();
+      chirpOsc.type = 'sawtooth';
+      chirpOsc.frequency.value = 1200;
+
+      const chirpLFO = ac.createOscillator();
+      chirpLFO.type = 'square';
+      chirpLFO.frequency.value = 38; // ~38 crackles per second
+
+      const chirpLFOGain = ac.createGain();
+      chirpLFOGain.gain.value = 0.18;
+      chirpLFO.connect(chirpLFOGain);
+      // Modulate chirp oscillator amplitude
+      const chirpAmpGain = ac.createGain();
+      chirpAmpGain.gain.value = 0.15;
+      chirpLFOGain.connect(chirpAmpGain.gain);
+      chirpOsc.connect(chirpAmpGain);
+      chirpAmpGain.connect(master);
+      chirpOsc.start();
+      chirpLFO.start();
+
+      // Layer 3: electric buzz – fast-modulated mid-range oscillator
+      const buzzOsc = ac.createOscillator();
+      buzzOsc.type = 'square';
+      buzzOsc.frequency.value = 320;
+
+      const buzzLFO = ac.createOscillator();
+      buzzLFO.type = 'sawtooth';
+      buzzLFO.frequency.value = 60;
+      const buzzLFOGain = ac.createGain();
+      buzzLFOGain.gain.value = 90;
+      buzzLFO.connect(buzzLFOGain);
+      buzzLFOGain.connect(buzzOsc.frequency);
+
+      const buzzFilter = ac.createBiquadFilter();
+      buzzFilter.type = 'bandpass';
+      buzzFilter.frequency.value = 2800;
+      buzzFilter.Q.value = 1.5;
+      const buzzGain = ac.createGain();
+      buzzGain.gain.value = 0.1;
+      buzzOsc.connect(buzzFilter);
+      buzzFilter.connect(buzzGain);
+      buzzGain.connect(master);
+      buzzOsc.start();
+      buzzLFO.start();
+
+      chidoriNodes = { noise, chirpOsc, chirpLFO, buzzOsc, buzzLFO, master };
     }
 
     function stopChidoriSound() {
       if (chidoriNodes) {
         const nodes = chidoriNodes;
         chidoriNodes = null;
-        try { nodes.gainNode.gain.linearRampToValueAtTime(0, getAudioCtx().currentTime + 0.15); } catch(e) { console.error('chidori gain ramp:', e); }
-        setTimeout(() => { try { nodes.noise.stop(); } catch(e) { console.error('chidori stop:', e); } }, 200);
+        const ac = getAudioCtx();
+        try { nodes.master.gain.linearRampToValueAtTime(0, ac.currentTime + 0.15); } catch(e) { console.error('chidori gain ramp:', e); }
+        setTimeout(() => {
+          try { nodes.noise.stop(); } catch(e) {}
+          try { nodes.chirpOsc.stop(); } catch(e) {}
+          try { nodes.chirpLFO.stop(); } catch(e) {}
+          try { nodes.buzzOsc.stop(); } catch(e) {}
+          try { nodes.buzzLFO.stop(); } catch(e) {}
+        }, 200);
       }
     }
 
