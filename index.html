@@ -78,6 +78,7 @@
     });
     function playRasenganSound() {
       const ac = getAudioCtx();
+      ac.resume();
       stopRasenganSound();
       const osc = ac.createOscillator();
       const gainNode = ac.createGain();
@@ -100,14 +101,16 @@
 
     function stopRasenganSound() {
       if (rasenganNodes) {
-        try { rasenganNodes.gainNode.gain.linearRampToValueAtTime(0, getAudioCtx().currentTime + 0.2); } catch(e) { console.error('rasengan gain ramp:', e); }
-        setTimeout(() => { try { rasenganNodes.osc.stop(); rasenganNodes.lfo.stop(); } catch(e) { console.error('rasengan stop:', e); } }, 250);
+        const nodes = rasenganNodes;
         rasenganNodes = null;
+        try { nodes.gainNode.gain.linearRampToValueAtTime(0, getAudioCtx().currentTime + 0.2); } catch(e) { console.error('rasengan gain ramp:', e); }
+        setTimeout(() => { try { nodes.osc.stop(); nodes.lfo.stop(); } catch(e) { console.error('rasengan stop:', e); } }, 250);
       }
     }
 
     function playChidoriSound() {
       const ac = getAudioCtx();
+      ac.resume();
       stopChidoriSound();
       const bufferSize = ac.sampleRate * 2;
       const buffer = ac.createBuffer(1, bufferSize, ac.sampleRate);
@@ -132,9 +135,10 @@
 
     function stopChidoriSound() {
       if (chidoriNodes) {
-        try { chidoriNodes.gainNode.gain.linearRampToValueAtTime(0, getAudioCtx().currentTime + 0.15); } catch(e) { console.error('chidori gain ramp:', e); }
-        setTimeout(() => { try { chidoriNodes.noise.stop(); } catch(e) { console.error('chidori stop:', e); } }, 200);
+        const nodes = chidoriNodes;
         chidoriNodes = null;
+        try { nodes.gainNode.gain.linearRampToValueAtTime(0, getAudioCtx().currentTime + 0.15); } catch(e) { console.error('chidori gain ramp:', e); }
+        setTimeout(() => { try { nodes.noise.stop(); } catch(e) { console.error('chidori stop:', e); } }, 200);
       }
     }
 
